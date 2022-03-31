@@ -29,8 +29,8 @@ def draw_2d_surface(points, x, y):
     y_axis = np.linspace(last_point[1] - shift, last_point[1] + shift, 100)
     grid = np.meshgrid(x_axis, y_axis)
 
-    # ax = plt.figure().add_subplot(projection='3d')
-    # ax.plot_surface(*grid, f(*grid))
+    ax = plt.figure().add_subplot(projection='3d')
+    ax.plot_surface(*grid, f(grid, x, y))
     plt.plot(points[:, 0], points[:, 1], 'o-')
     for i, point in enumerate(points):
         plt.text(*point, f'{i}')
@@ -54,7 +54,6 @@ def grad(x_batch, y_batch, point):
         f_minus = f(point, x_batch, y_batch)
         point[i] = point[i] + h
         result[i] = (f_plus - f_minus) / (2 * h)
-
     return result
 
 
@@ -169,10 +168,8 @@ def main():
     x, y = DatasetReader('planar').data
     # x_batch = [[1, 2, 3], [1, 2, 3], ..., ] # n-1 мерная точка
     # y_batch = [1, 2, ..., ]
-    # n_batch = [[1, 2, 3], ...] # n-мерная точка
     scalars = sgd(grad, x, y, start=[0, 1], batch_size=5, epoch=50, random_state=0)
     # print(np.array(scalars))
-
     draw_2d_surface(np.array(scalars), x, y)
 
 

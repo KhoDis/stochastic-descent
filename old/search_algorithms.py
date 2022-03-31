@@ -37,7 +37,7 @@ class Dichotomy:
     def g(self, alpha):
         return f(self.point + alpha * self.direction, self.x_batch, self.y_batch)
 
-    def calculate(self, eps=0.01, delta=0.01, strength=2):
+    def calculate(self, eps=0.01, delta=0.01, strength=1.1):
         alpha_beg = 0
         alpha_mid = 10 ** (-count_degree(np.max(self.direction)))
         alpha_end = self.__generate_next_alpha(alpha_mid, operator.ge, strength)

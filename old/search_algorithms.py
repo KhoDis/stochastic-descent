@@ -3,7 +3,18 @@ import operator
 import numpy as np
 from deprecated import deprecated
 
-from function import f
+
+def f(point, x, y):
+    # print('f_point', point)
+    # print('f_x', x)
+    # print('f_y', y)
+    accumulator = 0
+    for j in range(0, len(y)):
+        prediction = point[0]
+        for i in range(1, len(point)):
+            prediction += x[j][i - 1] * point[i]
+        accumulator += (y[j] - prediction) ** 2
+    return accumulator
 
 
 @deprecated
@@ -17,14 +28,16 @@ def count_degree(number):
 
 @deprecated
 class Dichotomy:
-    def __init__(self, point, direction):
+    def __init__(self, point, direction, x_batch, y_batch):
         self.point = point
         self.direction = direction
+        self.x_batch = x_batch
+        self.y_batch = y_batch
 
     def g(self, alpha):
-        return f(*(self.point + alpha * self.direction))
+        return f(self.point + alpha * self.direction, self.x_batch, self.y_batch)
 
-    def calculate(self, eps=0.01, delta=0.001, strength=10):
+    def calculate(self, eps=0.01, delta=0.01, strength=2):
         alpha_beg = 0
         alpha_mid = 10 ** (-count_degree(np.max(self.direction)))
         alpha_end = self.__generate_next_alpha(alpha_mid, operator.ge, strength)

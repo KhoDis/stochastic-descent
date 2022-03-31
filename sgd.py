@@ -32,9 +32,10 @@ def draw_2d_surface(points, x, y):
     ax = plt.figure().add_subplot(projection='3d')
     ax.plot_surface(*grid, f(grid, x, y))
     plt.plot(points[:, 0], points[:, 1], 'o-')
-    for i, point in enumerate(points):
-        plt.text(*point, f'{i}')
-    print('x', x)
+    # for i, point in enumerate(points):
+    #     plt.text(*point, f'{i}')
+    # print('x', x)
+    print(f'{x=}')
     print('y', y)
     print('points', points)
     # print('grid', np.array(grid))

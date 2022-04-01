@@ -1,13 +1,10 @@
 import operator
 
 import numpy as np
-from deprecated import deprecated
 
 
+# noinspection DuplicatedCode
 def f(point, x, y):
-    # print('f_point', point)
-    # print('f_x', x)
-    # print('f_y', y)
     accumulator = 0
     for j in range(0, len(y)):
         prediction = point[0]
@@ -17,7 +14,6 @@ def f(point, x, y):
     return accumulator
 
 
-@deprecated
 def count_degree(number):
     count = 0
     while number > 0:
@@ -26,7 +22,6 @@ def count_degree(number):
     return count - 2
 
 
-@deprecated
 class Dichotomy:
     def __init__(self, point, direction, x_batch, y_batch):
         self.point = point

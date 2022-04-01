@@ -24,16 +24,23 @@ def f(point, x, y):
 def draw_2d_surface(points, x, y):
     shift = 5
 
-    last_point = points[-1]
-    x_axis = np.linspace(last_point[0] - shift, last_point[0] + shift, 100)
-    y_axis = np.linspace(last_point[1] - shift, last_point[1] + shift, 100)
-    points_t = np.transpose(points)
-     # np.meshgrid(x_axis, y_axis)
-
-    x_grid, y_grid = np.meshgrid(x_axis, y_axis)
-
+    # shift = 2
+    # last_point = points[-1]
+    x_axis = np.linspace(-5, 5, 1000)
+    y_axis = np.linspace(-5, 5, 1000)
+    # x_axis = np.linspace(last_point[0] - shift, last_point[0] + shift, 1000)
+    # y_axis = np.linspace(last_point[1] - shift, last_point[1] + shift, 1000)
+    zp = np.ndarray((1000, 1000))
+    # grid = np.meshgrid(x_axis, y_axis)
     # ax = plt.figure().add_subplot(projection='3d')
     # ax.plot_surface(*grid, f(grid, x, y))
+
+    # TODO: try out axis swapping
+    # TODO: annotate contours
+    for i in range(0, len(x_axis)):
+        for j in range(0, len(y_axis)):
+            zp[j][i] = f([x_axis[i], y_axis[j]], x, y)
+
     plt.plot(points[:, 0], points[:, 1], 'o-')
     # for i, point in enumerate(points):
     #     plt.text(*point, f'{i}')

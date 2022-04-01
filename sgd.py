@@ -7,7 +7,7 @@ from old.search_algorithms import Dichotomy
 
 mpl.use('TkAgg')
 
-
+# noinspection DuplicatedCode
 def f(point, x, y):
     # print('f_point', point)
     # print('f_x', x)
@@ -22,7 +22,9 @@ def f(point, x, y):
 
 
 def draw_2d_surface(points, x, y):
-    shift = 5
+    points = np.array(points, "float64")
+    print('x', x)
+    print('y', y)
 
     # shift = 2
     # last_point = points[-1]
@@ -42,16 +44,13 @@ def draw_2d_surface(points, x, y):
             zp[j][i] = f([x_axis[i], y_axis[j]], x, y)
 
     plt.plot(points[:, 0], points[:, 1], 'o-')
-    # for i, point in enumerate(points):
-    #     plt.text(*point, f'{i}')
-    # print('x', x)
-    # print(f'{x=}')
-    # print('y', y)
-    # print('points', points)
-    # print('grid', np.array(grid))
-    # print('z', z)
+    plt.text(*points[0], f'({points[0][0]}, {points[0][1]}) - {f(points[0], x, y):.5f}')
+    plt.text(*points[-1], f'({points[-1][0]:.2f}, {points[-1][1]:.2f}) - {f(points[-1], x, y):.5f}')
     levels = sorted([f(p, x, y) for p in points])
-    plt.contour(x_grid, y_grid, f([x_grid, y_grid], x, y), levels=levels)
+    print('levels', levels)
+    # contours = plt.contour(*grid, f(grid, x, y), levels=levels)
+    contours = plt.contour(x_axis, y_axis, zp, levels)
+    plt.clabel(contours, inline=1, fontsize=10)
     plt.show()
     plt.clf()
 

@@ -27,20 +27,24 @@ def draw_2d_surface(points, x, y):
     last_point = points[-1]
     x_axis = np.linspace(last_point[0] - shift, last_point[0] + shift, 100)
     y_axis = np.linspace(last_point[1] - shift, last_point[1] + shift, 100)
-    grid = np.meshgrid(x_axis, y_axis)
+    points_t = np.transpose(points)
+     # np.meshgrid(x_axis, y_axis)
 
-    ax = plt.figure().add_subplot(projection='3d')
-    ax.plot_surface(*grid, f(grid, x, y))
+    x_grid, y_grid = np.meshgrid(x_axis, y_axis)
+
+    # ax = plt.figure().add_subplot(projection='3d')
+    # ax.plot_surface(*grid, f(grid, x, y))
     plt.plot(points[:, 0], points[:, 1], 'o-')
     # for i, point in enumerate(points):
     #     plt.text(*point, f'{i}')
     # print('x', x)
-    print(f'{x=}')
-    print('y', y)
-    print('points', points)
+    # print(f'{x=}')
+    # print('y', y)
+    # print('points', points)
     # print('grid', np.array(grid))
     # print('z', z)
-    plt.contour(*grid, f(grid, x, y), sorted([f(p, x, y) for p in points]))
+    levels = sorted([f(p, x, y) for p in points])
+    plt.contour(x_grid, y_grid, f([x_grid, y_grid], x, y), levels=levels)
     plt.show()
     plt.clf()
 
@@ -147,8 +151,8 @@ def sgd(
             # grad = np.array(gradient(n_batch, current_point), dtype_)
             grad_ = np.array(gradient(xy[start:stop, :-1], xy[start:stop, -1:], current_point), dtype_)
 
-            print('current_point', current_point)
-            print('-grad_', -grad_)
+            # print('current_point', current_point)
+            # print('-grad_', -grad_)
             diff = -Dichotomy(current_point, -grad_, xy[start:stop, :-1], xy[start:stop, -1:]).calculate() * grad_
 
             # # Checking if the absolute difference is small enough

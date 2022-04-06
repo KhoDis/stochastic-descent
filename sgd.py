@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt, cm
 
 from dataset_reader import DatasetReader
 from old.search_algorithms import Dichotomy
-from scaler import Scaler
+from abstractscaler import AbstractScaler
 
 mpl.use('TkAgg')
 
@@ -72,15 +72,14 @@ def scale(axis):
 
 def sgd(
         gradient, x, y, start, batch_size=1, epoch=50,
-        tolerance=1e-06, random_state=None, scaling=False, dtype="float64"):
+        tolerance=1e-06, random_state=None, scaler_ctor=AbstractScaler, dtype="float64"):
     dtype_ = np.dtype(dtype)
     x = np.array(x, dtype=dtype_)
     y = np.array(y, dtype=dtype_)
     n_obs = len(x)
 
-    # New
-    scaler = Scaler()
-    x = scaler.scale(x)
+    scaler = scaler_ctor(x)
+    x = scaler.data
 
     # Initializing the random number generator for shuffling
     seed = None if random_state is None else int(random_state)
@@ -140,16 +139,14 @@ def sgd(
 
     draw_2d_surface(scalars, x, y)
 
-    # New
-    scalars = scaler.rescale(scalars)
-    return scalars
+    return scaler.rescale(scalars)
 
 
 def main():
     x, y = DatasetReader('planar').data
     # x_batch = [[1, 2, 3], [1, 2, 3], ..., ] # n-1 мерная точка
     # y_batch = [1, 2, ..., ]
-    scalars = sgd(grad, x, y, start=[0, 1], batch_size=5, epoch=20, random_state=0, scaling=True)
+    scalars = sgd(grad, x, y, start=[0, 1], batch_size=5, epoch=20, random_state=0)
 
     print("Optimal:", scalars[-1])
     draw_linear_regression(scalars, x, y)

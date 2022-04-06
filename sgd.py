@@ -9,15 +9,7 @@ from abstractscaler import AbstractScaler
 mpl.use('TkAgg')
 
 
-# noinspection DuplicatedCode
-def f(point, x, y):
-    accumulator = 0
-    for j in range(0, len(y)):
-        prediction = point[0]
-        for i in range(1, len(point)):
-            prediction += x[j][i - 1] * point[i]
-        accumulator += (y[j] - prediction) ** 2
-    return accumulator
+
 
 
 def draw_2d_surface(points, x, y):
@@ -49,18 +41,6 @@ def draw_2d_surface(points, x, y):
     plt.show()
     plt.clf()
 
-
-def grad(x_batch, y_batch, point):
-    h = 1e-5
-    result = np.zeros(point.size)
-    for i, n in enumerate(point):
-        point[i] = point[i] + h
-        f_plus = f(point, x_batch, y_batch)
-        point[i] = point[i] - 2 * h
-        f_minus = f(point, x_batch, y_batch)
-        point[i] = point[i] + h
-        result[i] = (f_plus - f_minus) / (2 * h)
-    return result
 
 
 def scale(axis):
@@ -112,24 +92,41 @@ def sgd(
     for i in range(epoch):
         rng.shuffle(xy)
 
+        previous_grad_ =
+        previous_s_ = []  # TODO: we need to initialize this too to not get an error
+        previous_v_ = []  # TODO: there's no difference between None and []. Both cases will cause an error
         for start in range(0, n_obs, batch_size):
             stop = start + batch_size
 
-            # TODO: We need to expand this to n dimensions
-            # n_batch = get_batch(dataset, start, stop)
-            # x_batch, y_batch = dataset[start:stop, :-1], dataset[start:stop, -1:]
+            # Working variant
+            # grad_ = np.array(gradient(xy[start:stop, :-1], xy[start:stop, -1:], current_point), dtype_)
 
-            # Recalculating the difference
-            # TODO: We need to pass to the gradient n dimensional batch and current_point (2 args). Code is below
-            # grad = np.array(gradient(n_batch, current_point), dtype_)
+            beta = 0.01  # Could be passed using GradientMod constructor (in main method)
+            # TODO: dichotomy could be made in one method. there's no point to use the class
+            # Dichotomy(current_point, -grad_, xy[start:stop, :-1], xy[start:stop, -1:]).calculate()
+            learning_rate = 0.01
+            # Momentum
             grad_ = np.array(gradient(xy[start:stop, :-1], xy[start:stop, -1:], current_point), dtype_)
+            grad_ = beta * previous_grad_ + (1 - beta) * grad_
+            # Nesterov
+            grad_ = np.array(gradient(xy[start:stop, :-1], xy[start:stop, -1:], current_point - beta * previous_grad_), dtype_)
+            grad_ = beta * previous_grad_ + learning_rate * grad_
+            # Ada Gradient
+            grad_ = np.array(gradient(xy[start:stop, :-1], xy[start:stop, -1:], current_point), dtype_)
+            s_ = previous_s_ + grad_ ** 2
+            learning_rate = learning_rate / np.sqrt(np.array(s_))  # где ты это нашёл?
+            # RMS Prop
+            grad_ = np.array(gradient(xy[start:stop, :-1], xy[start:stop, -1:], current_point), dtype_)
+            v_ = beta * previous_v_ + (1 - beta) * grad_ ** 2
+            learning_rate = learning_rate / np.sqrt(np.array(v_))
 
-            # print('current_point', current_point)
-            # print('-grad_', -grad_)
+            previous_grad_ = grad_
+            previous_s_ = s_
+            previous_v_ = v_
 
-            diff = -Dichotomy(current_point, -grad_, xy[start:stop, :-1], xy[start:stop, -1:]).calculate() * grad_
+            diff = -learning_rate * grad_
 
-            # # Checking if the absolute difference is small enough
+            # There's no point to iterate further if we found the minima
             # if np.all(np.abs(diff) <= tolerance):
             #     break
 

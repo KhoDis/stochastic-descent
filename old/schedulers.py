@@ -53,7 +53,7 @@ class DichotomyScheduler:
     # noinspection PyUnusedLocal
     # noinspection PyMethodMayBeStatic
     def show(self, n, point, direction):
-        return Dichotomy(point, direction).calculate()
+        return Dichotomy(point, direction).calculate()  # TODO: swini? Parameter 'x_batch' unfilled
 
     @staticmethod
     def name():

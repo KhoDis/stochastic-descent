@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt, cm
 
 from dataset_reader import DatasetReader
 from old.search_algorithms import Dichotomy
+from scaler import Scaler
 
 mpl.use('TkAgg')
 
@@ -77,20 +78,9 @@ def sgd(
     y = np.array(y, dtype=dtype_)
     n_obs = len(x)
 
-    x_reverts = []
-    if scaling:
-        x_axes = []
-        for x_row in np.transpose(x):
-            x_row_scaled, revert = scale(x_row)
-            x_axes.append(x_row_scaled)
-            x_reverts.append(revert)
-        x = np.array(np.transpose(x_axes), dtype=dtype_)
-
-    # TODO: maybe this same
-    # x_reverts = []
-    # for x_row in np.transpose(x):
-    #     x_row, revert = scale(x_row)
-    #     x_reverts.append(revert)
+    # New
+    scaler = Scaler()
+    x = scaler.scale(x)
 
     # Initializing the random number generator for shuffling
     seed = None if random_state is None else int(random_state)
@@ -117,7 +107,6 @@ def sgd(
     #     raise ValueError("'tolerance' must be greater than zero")
 
     current_point = np.array(start, dtype=dtype_)
-
     xy = np.c_[x.reshape(n_obs, -1), y.reshape(n_obs, 1)]
 
     scalars = [start]
@@ -151,15 +140,8 @@ def sgd(
 
     draw_2d_surface(scalars, x, y)
 
-    if scaling:
-        for i in range(0, len(scalars)):
-            for j in range(1, len(scalars[i])):
-                scalars[i][0] -= scalars[i][j] * (x_reverts[j - 1][0] / x_reverts[j - 1][1])
-        scalars = np.transpose(scalars)
-        for j in range(1, len(scalars)):
-            scalars[j] /= x_reverts[j - 1][1]
-        scalars = np.transpose(scalars)
-
+    # New
+    scalars = scaler.rescale(scalars)
     return scalars
 
 

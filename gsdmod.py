@@ -1,86 +1,74 @@
 import numpy as np
 
-from function import gradient, f
-
 
 class DefaultGradientMod(object):
-    def __init__(self, learning_rate):
-        self.learning_rate = learning_rate
+    def _gradient(self, f, point):
+        return np.array(f.gradient(point))
 
-    def __gradient(self, x, y, point):
-        return np.array(gradient(x, y, point))
-
-    def direction(self, x, y, point):
-        return self.__gradient(x, y, point)
+    def direction(self, f, point, learning_rate):
+        return -learning_rate * self._gradient(f, point)
 
 
 class MomentumGradientMod(DefaultGradientMod):
-    def __init__(self, learning_rate, beta):
-        super().__init__(learning_rate)
+    def __init__(self, beta):
         self.beta = beta
-        self.previous_grad = None  # TODO: we need to initialize this via np.array in order to make this work properly
+        self.previous_grad = None
 
-    def direction(self, x, y, point):
-        g = self.__gradient(x, y, point)
+    def direction(self, f, point, learning_rate):
+        self.previous_grad = np.zeros(point.shape[0]) if self.previous_grad is None else self.previous_grad
 
-        grad = self.beta * self.previous_grad + (1 - self.beta) * g
+        new_grad = self.beta * self.previous_grad + (1 - self.beta) * self._gradient(f, point)
 
-        self.previous_grad = grad
+        self.previous_grad = new_grad
 
-        return grad
+        return -learning_rate * new_grad
 
 
 class NesterovGradientMod(DefaultGradientMod):
-    def __init__(self, learning_rate, beta):
-        super().__init__(learning_rate)
+    def __init__(self, beta):
         self.beta = beta
-        self.previous_grad = None  # TODO: we need to initialize this via np.array in order to make this work properly
+        self.previous_grad = None
 
-    def __gradient(self, x, y, point):
-        return np.array(gradient(x, y, point - self.beta * self.previous_grad))
+    def _gradient(self, f, point):
+        return np.array(f.gradient(point - self.beta * self.previous_grad))
 
-    def direction(self, x, y, point):
-        g = self.__gradient(x, y, point)
+    def direction(self, f, point, learning_rate):
+        self.previous_grad = np.zeros(point.shape[0]) if self.previous_grad is None else self.previous_grad
 
-        grad = self.beta * self.previous_grad + self.learning_rate * g
+        new_grad = self.beta * self.previous_grad + learning_rate * self._gradient(f, point)
 
-        self.previous_grad = grad
+        self.previous_grad = new_grad
 
-        return grad
+        return -new_grad
 
 
 class AdaGradientMod(DefaultGradientMod):
-    def __init__(self, learning_rate):
-        super().__init__(learning_rate)
-        self.previous_s = None  # TODO: we need to initialize this via np.array in order to make this work properly
-        self.previous_grad = 0  # TODO: we need to initialize this via np.array in order to make this work properly
+    def __init__(self):
+        self.previous_s = None
 
-    def direction(self, x, y, point):
-        g = self.__gradient(x, y, point)
-        s = np.array(self.previous_s + g ** 2)
+    def direction(self, f, point, learning_rate):
+        self.previous_s = np.zeros(point.shape[0]) if self.previous_s is None else self.previous_s
 
-        grad = -(self.learning_rate / np.sqrt(s)) * g
+        grad = self._gradient(f, point)
+        new_s = np.array(self.previous_s + grad ** 2)
+        direction = - learning_rate / np.sqrt(new_s) * grad
 
-        self.previous_grad = grad
-        self.previous_s = s
+        self.previous_s = new_s
 
-        return grad
+        return direction
 
 
 class RmsProp(DefaultGradientMod):
-    def __init__(self, learning_rate, beta):
-        super().__init__(learning_rate)
+    def __init__(self, beta):
         self.beta = beta
-        self.previous_v = None  # TODO: we need to initialize this via np.array in order to make this work properly
-        self.previous_grad = 0  # TODO: we need to initialize this via np.array in order to make this work properly
+        self.previous_v = None
 
-    def direction(self, x, y, point):
-        g = self.__gradient(x, y, point)
-        v = self.beta * self.previous_v + (1 - self.beta) * g ** 2
+    def direction(self, f, point, learning_rate):
+        self.previous_v = np.zeros(point.shape[0]) if self.previous_v is None else self.previous_v
 
-        grad = -(self.learning_rate / np.sqrt(v)) * g
+        grad = self._gradient(f, point)
+        new_v = self.beta * self.previous_v + (1 - self.beta) * grad ** 2
+        grad = -learning_rate / np.sqrt(new_v) * grad
 
-        self.previous_grad = grad  # TODO: why it's not used
-        self.previous_v = v
-
+        self.previous_v = new_v
         return grad

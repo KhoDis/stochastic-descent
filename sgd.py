@@ -1,23 +1,25 @@
 import os
-import matplotlib as mpl
 import numpy as np
+
+import matplotlib as mpl
 from matplotlib import pyplot as plt, cm
 
-from old.search_algorithms import Dichotomy
+
+from abstractscaler import DefaultScaler, MinMaxScaler
 from dataset_reader import DatasetReader
-from function import gradient, f
-from abstractscaler import *
-from gsdmod import DefaultGradientMod, MomentumGradientMod
+from funcutils import FuncUtils
+from gsdmod import DefaultGradientMod, MomentumGradientMod, NesterovGradientMod, AdaGradientMod, RmsProp
+from old.schedulers import ConstLRScheduler, DichotomyScheduler
 
 mpl.use('TkAgg')
 
 dtype_ = np.dtype("float64")
 
 
-def draw_2d_surface(points, x, y, scaler_name, method_name):
+def draw_2d_surface(points, func_utils, scaler_name, method_name):
     points = np.array(points, dtype_)
 
-    shift = 1
+    shift = 3
     last_point = points[-1]
     x_axis = np.linspace(last_point[0] - shift, last_point[0] + shift, 1000)
     y_axis = np.linspace(last_point[1] - shift, last_point[1] + shift, 1000)
@@ -25,13 +27,13 @@ def draw_2d_surface(points, x, y, scaler_name, method_name):
     zp = np.ndarray((1000, 1000))
     for i in range(0, len(x_axis)):
         for j in range(0, len(y_axis)):
-            zp[j][i] = f([x_axis[i], y_axis[j]], x, y)
+            zp[j][i] = func_utils.f([x_axis[i], y_axis[j]])
     # grid = np.meshgrid(x_axis, y_axis)
 
     plt.plot(points[:, 0], points[:, 1], 'o-')
-    plt.text(*points[0], f'({points[0][0]}, {points[0][1]}) - {f(points[0], x, y):.5f}')
-    plt.text(*points[-1], f'({points[-1][0]:.2f}, {points[-1][1]:.2f}) - {f(points[-1], x, y):.5f}')
-    plt.contour(x_axis, y_axis, zp, sorted([f(p, x, y) for p in points]))
+    plt.text(*points[0], f'({points[0][0]}, {points[0][1]}) - {func_utils.f(points[0]):.5f}')
+    plt.text(*points[-1], f'({points[-1][0]:.2f}, {points[-1][1]:.2f}) - {func_utils.f(points[-1]):.5f}')
+    plt.contour(x_axis, y_axis, zp, sorted([func_utils.f(p) for p in points]))
     # contours = plt.contour(*grid, f(grid, x, y), levels=levels)
 
     # TODO: sort out
@@ -42,7 +44,7 @@ def draw_2d_surface(points, x, y, scaler_name, method_name):
     os.makedirs(path, exist_ok=True)
     plt.savefig(f'{path}/scaler-{scaler_name}_method-{method_name}.png')
 
-    # plt.show()
+    plt.show()
     plt.clf()
 
 
@@ -53,31 +55,25 @@ def scale(axis):
     return scaled, [axis_min, axis_max - axis_min]
 
 
-def sgd(x, y, start, batch_size=1, epoch=50, tolerance=1e-06, random_state=None,
+def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
+        scheduler=ConstLRScheduler(0.1),
         scaler_ctor=None,
-        sgd_mod=DefaultGradientMod(0.1)):
+        sgd_mod=DefaultGradientMod()):
+    tolerance = 1e-06
     scaler_ctor = DefaultScaler if scaler_ctor is None else scaler_ctor
-
 
     x = np.array(x, dtype=dtype_)
     y = np.array(y, dtype=dtype_)
     n_obs = len(x)
 
     scaler = scaler_ctor(x)
-    is_scaled = scaler is not DefaultScaler
     x = scaler.data
 
     method_name = type(sgd_mod).__name__[:-3]
     scaler_name = type(scaler).__name__
 
-    # Initializing the random number generator for shuffling
     seed = None if random_state is None else int(random_state)
     rng = np.random.default_rng(seed=seed)
-
-    # Setting up and checking the learning rate
-    # learn_rate = np.array(learn_rate, dtype=dtype_)
-    # if np.any(learn_rate <= 0):
-    #     raise ValueError("'learn_rate' must be greater than zero")
 
     batch_size = int(batch_size)
     if not 0 < batch_size <= n_obs:
@@ -87,72 +83,73 @@ def sgd(x, y, start, batch_size=1, epoch=50, tolerance=1e-06, random_state=None,
     if epoch <= 0:
         raise ValueError("'epoch' must be greater than zero")
 
-    # Setting up and checking the tolerance
-    # We need it to check if the absolute difference is small enough
-    # We want to ignore absurdly different points to not to break our predictions
-    # tolerance = np.array(tolerance, dtype=dtype_)
-    # if np.any(tolerance <= 0):
-    #     raise ValueError("'tolerance' must be greater than zero")
+    tolerance = np.array(tolerance, dtype=dtype_)
+    if np.any(tolerance <= 0):
+        raise ValueError("'tolerance' must be greater than zero")
 
     current_point = np.array(start, dtype=dtype_)
     xy = np.c_[x.reshape(n_obs, -1), y.reshape(n_obs, 1)]
 
-    beta = 0.9
-    learning_rate = 0.1
-    previous_info = np.zeros(current_point.shape[0])
+    # beta = 0.9
+    # learning_rate = 0.1
+    # previous_info = np.zeros(current_point.shape[0])
 
     scalars = [start]
+    iter_count = 0
     for i in range(epoch):
         rng.shuffle(xy)
 
         for start in range(0, n_obs, batch_size):
+            iter_count += 1
             stop = start + batch_size
             x_batch = xy[start:stop, :-1]
             y_batch = xy[start:stop, -1:]
 
-            # TODO: УРОД НЕ УДАЛЯЙ ТУДУШКИ БЕЗ МОЕГО ВЕДОМА СВИН. ЭТО МОЖНО ПЕРЕПИСАТЬ ПРОСТО В МЕТОД
-            # NOTE: Working variant
-            grad_ = np.array(gradient(x_batch, y_batch, current_point), dtype_)
-            learning_rate = Dichotomy(current_point, -grad_, xy[start:stop, :-1], xy[start:stop, -1:]).calculate()
-            diff = -learning_rate * grad_
+            u = FuncUtils(x_batch, y_batch)
+            learning_rate = scheduler.show(iter_count, current_point, u)
+            diff = sgd_mod.direction(u, current_point, learning_rate)
+            # diff, previous_info = rms(u, current_point, previous_info, beta, learning_rate)
 
-            # direct = sgd_mod.direction(x_batch, y_batch, current_point)
-            # diff, previous_info = momentum(x_batch, y_batch, previous_info, current_point, beta, learning_rate)
-
-            # There's no point to iterate further if we found the minima
-            # if np.all(np.abs(diff) <= tolerance):
-            #     break
+            if np.all(np.abs(diff) <= tolerance):
+                break
 
             current_point += diff
             scalars.append(current_point.copy())
 
-    draw_2d_surface(scalars, x, y, scaler_name, method_name)
+    draw_2d_surface(scalars, FuncUtils(x, y), scaler_name, method_name)
     return scaler.rescale(scalars)
 
 
-def momentum(x, y, point, previous_grad, beta=0.9, learning_rate=0.1):
-    grad = np.array(gradient(x, y, point), dtype_)
+def simple(point, func_utils):
+    learning_rate = 0.1
+    grad = np.array(func_utils.gradient(point))
+    direction = -learning_rate * grad
+    return direction
+
+
+def momentum(func_utils, point, previous_grad, beta=0.9, learning_rate=0.1):
+    grad = np.array(func_utils.gradient(point))
     new_grad = beta * previous_grad + (1 - beta) * grad
-    direction = - learning_rate * new_grad
-    return direction, grad
-
-
-def nesterov(x, y, point, previous_grad, beta=0.9, learning_rate=0.1):
-    grad = np.array(gradient(x, y, point - beta * previous_grad), dtype_)
-    new_grad = beta * previous_grad + learning_rate * grad
-    direction = -grad
+    direction = -learning_rate * new_grad
     return direction, new_grad
 
 
-def rms(x, y, point, previous_v, beta=0.9, learning_rate=0.1):
-    grad = np.array(gradient(x, y, point), dtype_)
+def nesterov(func_utils, point, previous_grad, beta=0.9, learning_rate=0.1):
+    grad = np.array(func_utils.gradient(point - beta * previous_grad), dtype_)
+    new_grad = beta * previous_grad + learning_rate * grad
+    direction = -new_grad
+    return direction, new_grad
+
+
+def rms(func_utils, point, previous_v, beta=0.9, learning_rate=0.1):
+    grad = np.array(func_utils.gradient(point), dtype_)
     new_v = beta * previous_v + (1 - beta) * grad ** 2
     direction = - learning_rate / np.sqrt(new_v) * grad
     return direction, new_v
 
 
-def ada(x, y, point, previous_s, beta=0.9, learning_rate=0.1):
-    grad = np.array(gradient(x, y, point), dtype_)
+def ada(func_utils, point, previous_s, beta=0.9, learning_rate=0.1):
+    grad = np.array(func_utils.gradient(point), dtype_)
     new_s = previous_s + grad ** 2
     direction = - learning_rate / np.sqrt(new_s) * grad
     return direction, new_s
@@ -163,8 +160,9 @@ def main():
     # x_batch = [[1, 2, 3], [1, 2, 3], ..., ] # n-1 мерная точка
     # y_batch = [1, 2, ..., ]
     scalars = sgd(x, y, start=[0, 1], batch_size=5, epoch=20, random_state=0,
+                  scheduler=ConstLRScheduler(0.1),
                   scaler_ctor=MinMaxScaler,
-                  sgd_mod=MomentumGradientMod(0.1, 0.9))
+                  sgd_mod=MomentumGradientMod(beta=0.9))
 
     print("Optimal:", scalars[-1])
     # draw_linear_regression(scalars, x, y)

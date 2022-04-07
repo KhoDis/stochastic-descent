@@ -1,3 +1,4 @@
+import os
 import matplotlib as mpl
 import numpy as np
 from matplotlib import pyplot as plt, cm
@@ -10,14 +11,11 @@ from gsdmod import DefaultGradientMod, MomentumGradientMod
 
 mpl.use('TkAgg')
 
+dtype_ = np.dtype("float64")
 
 
-
-
-def draw_2d_surface(points, x, y):
-    # print('x', x)
-    # print('y', y)
-    points = np.array(points, "float64")
+def draw_2d_surface(points, x, y, scaler_name, method_name):
+    points = np.array(points, dtype_)
 
     shift = 1
     last_point = points[-1]
@@ -40,9 +38,12 @@ def draw_2d_surface(points, x, y):
     # ax = plt.figure().add_subplot(projection='3d')
     # ax.plot_surface(*np.meshgrid(x_axis, y_axis), zp)
 
-    plt.show()
-    plt.clf()
+    path = f'./img/2d_surface/'
+    os.makedirs(path, exist_ok=True)
+    plt.savefig(f'{path}/scaler-{scaler_name}_method-{method_name}.png')
 
+    # plt.show()
+    plt.clf()
 
 
 def scale(axis):
@@ -63,6 +64,7 @@ def sgd(x, y, start, batch_size=1, epoch=50, tolerance=1e-06, random_state=None,
     n_obs = len(x)
 
     scaler = scaler_ctor(x)
+    is_scaled = scaler is not DefaultScaler
     x = scaler.data
 
     method_name = type(sgd_mod).__name__[:-3]
@@ -95,15 +97,18 @@ def sgd(x, y, start, batch_size=1, epoch=50, tolerance=1e-06, random_state=None,
     current_point = np.array(start, dtype=dtype_)
     xy = np.c_[x.reshape(n_obs, -1), y.reshape(n_obs, 1)]
 
+    beta = 0.9
+    learning_rate = 0.1
+    previous_info = np.zeros(current_point.shape[0])
+
     scalars = [start]
     for i in range(epoch):
         rng.shuffle(xy)
 
-        previous_grad_ =
-        previous_s_ = []  # TODO: we need to initialize this too to not get an error
-        previous_v_ = []  # TODO: there's no difference between None and []. Both cases will cause an error
         for start in range(0, n_obs, batch_size):
             stop = start + batch_size
+            x_batch = xy[start:stop, :-1]
+            y_batch = xy[start:stop, -1:]
 
             # TODO: УРОД НЕ УДАЛЯЙ ТУДУШКИ БЕЗ МОЕГО ВЕДОМА СВИН. ЭТО МОЖНО ПЕРЕПИСАТЬ ПРОСТО В МЕТОД
             # NOTE: Working variant
@@ -118,23 +123,51 @@ def sgd(x, y, start, batch_size=1, epoch=50, tolerance=1e-06, random_state=None,
             # if np.all(np.abs(diff) <= tolerance):
             #     break
 
-            # Updating the values of the variables
             current_point += diff
             scalars.append(current_point.copy())
 
-    draw_2d_surface(scalars, x, y)
-
+    draw_2d_surface(scalars, x, y, scaler_name, method_name)
     return scaler.rescale(scalars)
+
+
+def momentum(x, y, point, previous_grad, beta=0.9, learning_rate=0.1):
+    grad = np.array(gradient(x, y, point), dtype_)
+    new_grad = beta * previous_grad + (1 - beta) * grad
+    direction = - learning_rate * new_grad
+    return direction, grad
+
+
+def nesterov(x, y, point, previous_grad, beta=0.9, learning_rate=0.1):
+    grad = np.array(gradient(x, y, point - beta * previous_grad), dtype_)
+    new_grad = beta * previous_grad + learning_rate * grad
+    direction = -grad
+    return direction, new_grad
+
+
+def rms(x, y, point, previous_v, beta=0.9, learning_rate=0.1):
+    grad = np.array(gradient(x, y, point), dtype_)
+    new_v = beta * previous_v + (1 - beta) * grad ** 2
+    direction = - learning_rate / np.sqrt(new_v) * grad
+    return direction, new_v
+
+
+def ada(x, y, point, previous_s, beta=0.9, learning_rate=0.1):
+    grad = np.array(gradient(x, y, point), dtype_)
+    new_s = previous_s + grad ** 2
+    direction = - learning_rate / np.sqrt(new_s) * grad
+    return direction, new_s
 
 
 def main():
     x, y = DatasetReader('planar').data
     # x_batch = [[1, 2, 3], [1, 2, 3], ..., ] # n-1 мерная точка
     # y_batch = [1, 2, ..., ]
-    scalars = sgd(grad, x, y, start=[0, 1], batch_size=5, epoch=20, random_state=0)
+    scalars = sgd(x, y, start=[0, 1], batch_size=5, epoch=20, random_state=0,
+                  scaler_ctor=MinMaxScaler,
+                  sgd_mod=MomentumGradientMod(0.1, 0.9))
 
     print("Optimal:", scalars[-1])
-    draw_linear_regression(scalars, x, y)
+    # draw_linear_regression(scalars, x, y)
 
 
 def draw_linear_regression(scalars, x, y):

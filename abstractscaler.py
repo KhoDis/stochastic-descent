@@ -7,7 +7,6 @@ class AbstractScaler(object):
         self.revert_numbers = []
         for _ in range(len(data[0])):
             self.revert_numbers.append([0, 1])
-        print(len(self.revert_numbers))
 
     @property
     def data(self):
@@ -31,6 +30,11 @@ class AbstractScaler(object):
 
     def __scale_axis(self, axis):
         return axis, [0, 1]
+
+
+class DefaultScaler(AbstractScaler):
+    def __init__(self, data):
+        super().__init__(data)
 
 
 class MinMaxScaler(AbstractScaler):

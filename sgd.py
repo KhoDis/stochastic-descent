@@ -2,9 +2,11 @@ import matplotlib as mpl
 import numpy as np
 from matplotlib import pyplot as plt, cm
 
-from dataset_reader import DatasetReader
 from old.search_algorithms import Dichotomy
-from abstractscaler import AbstractScaler
+from dataset_reader import DatasetReader
+from function import gradient, f
+from abstractscaler import *
+from gsdmod import DefaultGradientMod, MomentumGradientMod
 
 mpl.use('TkAgg')
 
@@ -50,16 +52,21 @@ def scale(axis):
     return scaled, [axis_min, axis_max - axis_min]
 
 
-def sgd(
-        gradient, x, y, start, batch_size=1, epoch=50,
-        tolerance=1e-06, random_state=None, scaler_ctor=AbstractScaler, dtype="float64"):
-    dtype_ = np.dtype(dtype)
+def sgd(x, y, start, batch_size=1, epoch=50, tolerance=1e-06, random_state=None,
+        scaler_ctor=None,
+        sgd_mod=DefaultGradientMod(0.1)):
+    scaler_ctor = DefaultScaler if scaler_ctor is None else scaler_ctor
+
+
     x = np.array(x, dtype=dtype_)
     y = np.array(y, dtype=dtype_)
     n_obs = len(x)
 
     scaler = scaler_ctor(x)
     x = scaler.data
+
+    method_name = type(sgd_mod).__name__[:-3]
+    scaler_name = type(scaler).__name__
 
     # Initializing the random number generator for shuffling
     seed = None if random_state is None else int(random_state)
@@ -98,33 +105,14 @@ def sgd(
         for start in range(0, n_obs, batch_size):
             stop = start + batch_size
 
-            # Working variant
-            # grad_ = np.array(gradient(xy[start:stop, :-1], xy[start:stop, -1:], current_point), dtype_)
-
-            beta = 0.01  # Could be passed using GradientMod constructor (in main method)
-            # TODO: dichotomy could be made in one method. there's no point to use the class
-            # Dichotomy(current_point, -grad_, xy[start:stop, :-1], xy[start:stop, -1:]).calculate()
-            learning_rate = 0.01
-            # Momentum
-            grad_ = np.array(gradient(xy[start:stop, :-1], xy[start:stop, -1:], current_point), dtype_)
-            grad_ = beta * previous_grad_ + (1 - beta) * grad_
-            # Nesterov
-            grad_ = np.array(gradient(xy[start:stop, :-1], xy[start:stop, -1:], current_point - beta * previous_grad_), dtype_)
-            grad_ = beta * previous_grad_ + learning_rate * grad_
-            # Ada Gradient
-            grad_ = np.array(gradient(xy[start:stop, :-1], xy[start:stop, -1:], current_point), dtype_)
-            s_ = previous_s_ + grad_ ** 2
-            learning_rate = learning_rate / np.sqrt(np.array(s_))  # где ты это нашёл?
-            # RMS Prop
-            grad_ = np.array(gradient(xy[start:stop, :-1], xy[start:stop, -1:], current_point), dtype_)
-            v_ = beta * previous_v_ + (1 - beta) * grad_ ** 2
-            learning_rate = learning_rate / np.sqrt(np.array(v_))
-
-            previous_grad_ = grad_
-            previous_s_ = s_
-            previous_v_ = v_
-
+            # TODO: УРОД НЕ УДАЛЯЙ ТУДУШКИ БЕЗ МОЕГО ВЕДОМА СВИН. ЭТО МОЖНО ПЕРЕПИСАТЬ ПРОСТО В МЕТОД
+            # NOTE: Working variant
+            grad_ = np.array(gradient(x_batch, y_batch, current_point), dtype_)
+            learning_rate = Dichotomy(current_point, -grad_, xy[start:stop, :-1], xy[start:stop, -1:]).calculate()
             diff = -learning_rate * grad_
+
+            # direct = sgd_mod.direction(x_batch, y_batch, current_point)
+            # diff, previous_info = momentum(x_batch, y_batch, previous_info, current_point, beta, learning_rate)
 
             # There's no point to iterate further if we found the minima
             # if np.all(np.abs(diff) <= tolerance):

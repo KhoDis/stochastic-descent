@@ -25,7 +25,7 @@ def f(point, x, y):
     return accumulator
 
 
-def grad(x, y, point):
+def gradient(x, y, point):
     h = 1e-5
     result = np.zeros(point.size)
     for i, n in enumerate(point):

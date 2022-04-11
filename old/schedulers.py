@@ -8,7 +8,7 @@ class ConstLRScheduler:
         self.const = const
 
     # noinspection PyUnusedLocal
-    def show(self, n, point, f):
+    def show(self, n, func_utils, point):
         return self.const
 
     @staticmethod
@@ -22,7 +22,7 @@ class SteppedLRScheduler:
         self.step = step
 
     # noinspection PyUnusedLocal
-    def show(self, n, point, f):
+    def show(self, n, func_utils, point):
         return self.start + self.step * n
 
     @staticmethod
@@ -36,7 +36,7 @@ class ExponentialLRScheduler:
         self.step = step
 
     # noinspection PyUnusedLocal
-    def show(self, n, point, f):
+    def show(self, n, func_utils, point):
         return self.start * exp(-n * self.step)
 
     @staticmethod
@@ -47,8 +47,8 @@ class ExponentialLRScheduler:
 class DichotomyScheduler:
     # noinspection PyUnusedLocal
     @staticmethod
-    def show(n, point, f):
-        return Dichotomy(point, -f.gradient(point), f).calculate()
+    def show(n, func_utils, point):
+        return Dichotomy(point, func_utils).calculate()
 
     @staticmethod
     def name():

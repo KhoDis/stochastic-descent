@@ -4,55 +4,104 @@ import numpy as np
 import matplotlib as mpl
 from matplotlib import pyplot as plt, cm
 
-
-from abstractscaler import DefaultScaler, MinMaxScaler
+from drawer import Drawer
+from scaler import DefaultScaler, MinMaxScaler
 from dataset_reader import DatasetReader
-from funcutils import FuncUtils
-from gsdmod import DefaultGradientMod, MomentumGradientMod, NesterovGradientMod, AdaGradientMod, RmsProp
+from func_utils import FuncUtils
+# noinspection PyUnresolvedReferences
+from sgd_mod import DefaultGradientMod, MomentumGradientMod, NesterovGradientMod, AdaGradientMod, RmsProp
+# noinspection PyUnresolvedReferences
 from old.schedulers import ConstLRScheduler, DichotomyScheduler
 
 mpl.use('TkAgg')
 
+# noinspection SpellCheckingInspection
 dtype_ = np.dtype("float64")
 
 
-def draw_2d_surface(points, func_utils, scaler_name, method_name):
-    points = np.array(points, dtype_)
-
+def calculate_values(points, func_utils):
     shift = 3
+    amount = 1000
+
     last_point = points[-1]
-    x_axis = np.linspace(last_point[0] - shift, last_point[0] + shift, 1000)
-    y_axis = np.linspace(last_point[1] - shift, last_point[1] + shift, 1000)
+    X = np.linspace(last_point[0] - shift, last_point[0] + shift, amount)
+    Y = np.linspace(last_point[1] - shift, last_point[1] + shift, amount)
 
-    zp = np.ndarray((1000, 1000))
-    for i in range(0, len(x_axis)):
-        for j in range(0, len(y_axis)):
-            zp[j][i] = func_utils.f([x_axis[i], y_axis[j]])
-    # grid = np.meshgrid(x_axis, y_axis)
+    Z = np.ndarray((amount, amount))
+    for i in range(0, len(X)):
+        for j in range(0, len(Y)):
+            Z[j][i] = func_utils.f([X[i], Y[j]])
 
-    plt.plot(points[:, 0], points[:, 1], 'o-')
-    plt.text(*points[0], f'({points[0][0]}, {points[0][1]}) - {func_utils.f(points[0]):.5f}')
-    plt.text(*points[-1], f'({points[-1][0]:.2f}, {points[-1][1]:.2f}) - {func_utils.f(points[-1]):.5f}')
-    plt.contour(x_axis, y_axis, zp, sorted([func_utils.f(p) for p in points]))
-    # contours = plt.contour(*grid, f(grid, x, y), levels=levels)
+    return X, Y, Z
 
-    # TODO: sort out
-    # ax = plt.figure().add_subplot(projection='3d')
-    # ax.plot_surface(*np.meshgrid(x_axis, y_axis), zp)
 
-    path = f'./img/2d_surface/'
+def draw_3d(points, func_utils, scaler_name, method_name):
+    points = np.array(points, dtype_)
+    X, Y, Z = calculate_values(points, func_utils)
+
+    ax = plt.figure(figsize=(5, 5)).add_subplot(111, projection='3d')
+    ax.plot_surface(*np.meshgrid(X, Y), Z,
+                    color='green', alpha=0.5)
+
+    for point in points:
+        ax.plot(point[0], point[1], func_utils.f(point),
+                color='black', marker='o', markersize=3)
+
+    color = iter(cm.rainbow(np.linspace(0, 1, len(points))))
+    for i in range(1, len(points)):
+        c = next(color)
+        ax.plot([points[i - 1][0], points[i][0]],
+                [points[i - 1][1], points[i][1]],
+                [func_utils.f(points[i - 1]), func_utils.f(points[i])],
+                color=c, alpha=0.8)
+
+    ax.contour(X, Y, Z, sorted([func_utils.f(p) for p in points]),
+               alpha=0.3)
+
+    path = f'./img/3d/'
     os.makedirs(path, exist_ok=True)
     plt.savefig(f'{path}/scaler-{scaler_name}_method-{method_name}.png')
 
     plt.show()
-    plt.clf()
+    plt.close()
 
 
-def scale(axis):
-    axis_min = np.amin(axis)
-    axis_max = np.amax(axis)
-    scaled = (axis - axis_min) / (axis_max - axis_min)
-    return scaled, [axis_min, axis_max - axis_min]
+def draw_2d(points, func_utils, scaler_name, method_name):
+    points = np.array(points, dtype_)
+    X, Y, Z = calculate_values(points, func_utils)
+
+    plt.title('2d projection')
+    plt.xlabel('X axis')
+    plt.ylabel('Y axis')
+
+    plt.plot(points[:, 0], points[:, 1], 'o-')
+    plt.text(*points[0], f'({points[0][0]}, {points[0][1]}) - {func_utils.f(points[0]):.5f}')
+    plt.text(*points[-1], f'({points[-1][0]:.2f}, {points[-1][1]:.2f}) - {func_utils.f(points[-1]):.5f}')
+    plt.contour(X, Y, Z, sorted([func_utils.f(p) for p in points]))
+
+    path = f'./img/2d/'
+    os.makedirs(path, exist_ok=True)
+    plt.savefig(f'{path}/scaler-{scaler_name}_method-{method_name}.png')
+
+    plt.show()
+    plt.close()
+
+
+def draw_linear_regression(scalars, x, y):
+    plt.title('Gradient Descent')
+    plt.xlabel('X axis')
+    plt.ylabel('Y axis')
+    for point_index in range(0, len(x)):
+        plt.scatter(x[point_index][0], y[point_index], c="green")
+    color = iter(cm.rainbow(np.linspace(0, 1, len(scalars))))
+    for scalar in scalars:
+        c = next(color)
+        x = np.linspace(0, np.amax(x), 100)
+        y = scalar[0]
+        for i in range(1, len(scalar)):
+            y += x * scalar[i]
+        plt.plot(x, y, color=c)
+    plt.show()
 
 
 def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
@@ -60,6 +109,7 @@ def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
         scaler_ctor=None,
         sgd_mod=DefaultGradientMod()):
     tolerance = 1e-06
+
     scaler_ctor = DefaultScaler if scaler_ctor is None else scaler_ctor
 
     x = np.array(x, dtype=dtype_)
@@ -90,10 +140,6 @@ def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
     current_point = np.array(start, dtype=dtype_)
     xy = np.c_[x.reshape(n_obs, -1), y.reshape(n_obs, 1)]
 
-    # beta = 0.9
-    # learning_rate = 0.1
-    # previous_info = np.zeros(current_point.shape[0])
-
     scalars = [start]
     iter_count = 0
     for i in range(epoch):
@@ -106,9 +152,8 @@ def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
             y_batch = xy[start:stop, -1:]
 
             u = FuncUtils(x_batch, y_batch)
-            learning_rate = scheduler.show(iter_count, current_point, u)
-            diff = sgd_mod.direction(u, current_point, learning_rate)
-            # diff, previous_info = rms(u, current_point, previous_info, beta, learning_rate)
+            learning_rate = scheduler.show(iter_count, u, current_point)
+            diff = sgd_mod.diff(u, current_point, learning_rate)
 
             if np.all(np.abs(diff) <= tolerance):
                 break
@@ -116,43 +161,12 @@ def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
             current_point += diff
             scalars.append(current_point.copy())
 
-    draw_2d_surface(scalars, FuncUtils(x, y), scaler_name, method_name)
+    # draw_2d(scalars, FuncUtils(x, y), scaler_name, method_name)
+    # draw_3d(scalars, FuncUtils(x, y), scaler_name, method_name)
+    drawer = Drawer(scalars, FuncUtils(x, y), scaler_name, method_name)
+    drawer.draw_2d(False)
+    drawer.draw_3d(False)
     return scaler.rescale(scalars)
-
-
-def simple(point, func_utils):
-    learning_rate = 0.1
-    grad = np.array(func_utils.gradient(point))
-    direction = -learning_rate * grad
-    return direction
-
-
-def momentum(func_utils, point, previous_grad, beta=0.9, learning_rate=0.1):
-    grad = np.array(func_utils.gradient(point))
-    new_grad = beta * previous_grad + (1 - beta) * grad
-    direction = -learning_rate * new_grad
-    return direction, new_grad
-
-
-def nesterov(func_utils, point, previous_grad, beta=0.9, learning_rate=0.1):
-    grad = np.array(func_utils.gradient(point - beta * previous_grad), dtype_)
-    new_grad = beta * previous_grad + learning_rate * grad
-    direction = -new_grad
-    return direction, new_grad
-
-
-def rms(func_utils, point, previous_v, beta=0.9, learning_rate=0.1):
-    grad = np.array(func_utils.gradient(point), dtype_)
-    new_v = beta * previous_v + (1 - beta) * grad ** 2
-    direction = - learning_rate / np.sqrt(new_v) * grad
-    return direction, new_v
-
-
-def ada(func_utils, point, previous_s, beta=0.9, learning_rate=0.1):
-    grad = np.array(func_utils.gradient(point), dtype_)
-    new_s = previous_s + grad ** 2
-    direction = - learning_rate / np.sqrt(new_s) * grad
-    return direction, new_s
 
 
 def main():
@@ -160,29 +174,12 @@ def main():
     # x_batch = [[1, 2, 3], [1, 2, 3], ..., ] # n-1 мерная точка
     # y_batch = [1, 2, ..., ]
     scalars = sgd(x, y, start=[0, 1], batch_size=5, epoch=20, random_state=0,
-                  scheduler=ConstLRScheduler(0.1),
+                  scheduler=ConstLRScheduler(0.01),
                   scaler_ctor=MinMaxScaler,
-                  sgd_mod=MomentumGradientMod(beta=0.9))
+                  sgd_mod=NesterovGradientMod(beta=0.9))
 
     print("Optimal:", scalars[-1])
     # draw_linear_regression(scalars, x, y)
-
-
-def draw_linear_regression(scalars, x, y):
-    plt.title('Gradient Descent')
-    plt.xlabel('X axis')
-    plt.ylabel('Y axis')
-    for point_index in range(0, len(x)):
-        plt.scatter(x[point_index][0], y[point_index], c="green")
-    color = iter(cm.rainbow(np.linspace(0, 1, len(scalars))))
-    for scalar in scalars:
-        c = next(color)
-        x = np.linspace(0, np.amax(x), 100)
-        y = scalar[0]
-        for i in range(1, len(scalar)):
-            y += x * scalar[i]
-        plt.plot(x, y, color=c)
-    plt.show()
 
 
 if __name__ == '__main__':

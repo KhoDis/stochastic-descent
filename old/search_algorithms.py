@@ -10,10 +10,10 @@ def count_degree(number):
 
 
 class Dichotomy:
-    def __init__(self, point, direction, func):
+    def __init__(self, point, func_utils):
         self.point = point
-        self.direction = direction
-        self.func = func
+        self.func = func_utils.f
+        self.direction = -func_utils.f(point)
 
     def g(self, alpha):
         return self.func(self.point + alpha * self.direction)

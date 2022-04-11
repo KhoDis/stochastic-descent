@@ -5,7 +5,7 @@ class DefaultGradientMod(object):
     def _gradient(self, f, point):
         return np.array(f.gradient(point))
 
-    def direction(self, f, point, learning_rate):
+    def diff(self, f, point, learning_rate):
         return -learning_rate * self._gradient(f, point)
 
 
@@ -14,7 +14,7 @@ class MomentumGradientMod(DefaultGradientMod):
         self.beta = beta
         self.previous_grad = None
 
-    def direction(self, f, point, learning_rate):
+    def diff(self, f, point, learning_rate):
         self.previous_grad = np.zeros(point.shape[0]) if self.previous_grad is None else self.previous_grad
 
         new_grad = self.beta * self.previous_grad + (1 - self.beta) * self._gradient(f, point)
@@ -32,7 +32,7 @@ class NesterovGradientMod(DefaultGradientMod):
     def _gradient(self, f, point):
         return np.array(f.gradient(point - self.beta * self.previous_grad))
 
-    def direction(self, f, point, learning_rate):
+    def diff(self, f, point, learning_rate):
         self.previous_grad = np.zeros(point.shape[0]) if self.previous_grad is None else self.previous_grad
 
         new_grad = self.beta * self.previous_grad + learning_rate * self._gradient(f, point)
@@ -46,7 +46,7 @@ class AdaGradientMod(DefaultGradientMod):
     def __init__(self):
         self.previous_s = None
 
-    def direction(self, f, point, learning_rate):
+    def diff(self, f, point, learning_rate):
         self.previous_s = np.zeros(point.shape[0]) if self.previous_s is None else self.previous_s
 
         grad = self._gradient(f, point)
@@ -63,7 +63,7 @@ class RmsProp(DefaultGradientMod):
         self.beta = beta
         self.previous_v = None
 
-    def direction(self, f, point, learning_rate):
+    def diff(self, f, point, learning_rate):
         self.previous_v = np.zeros(point.shape[0]) if self.previous_v is None else self.previous_v
 
         grad = self._gradient(f, point)

@@ -106,8 +106,8 @@ def main():
                               sgd_mod=NesterovGradientMod(beta=0.9))
 
     drawer = Drawer(sgd_result)
-    drawer.draw_2d(True)
-    drawer.draw_3d(True)
+    drawer.draw_2d(False)
+    drawer.draw_3d(False)
 
     print("Optimal:", scalars[-1])
     # draw_linear_regression(scalars, x, y)

@@ -8,8 +8,9 @@ dtype_ = np.dtype("float64")
 
 
 class SGDResult:
-    def __init__(self, scalars, func_utils, scaler_name, method_name):
-        self.scalars = scalars
+    def __init__(self, rescaled_scalars, scaled_scalars, func_utils, scaler_name, method_name):
+        self.rescaled_scalars = rescaled_scalars
+        self.scaled_scalars = scaled_scalars
         self.func_utils = func_utils
         self.scaler_name = scaler_name
         self.method_name = method_name
@@ -41,7 +42,7 @@ class LineConfig(object):
 
 class Drawer(object):
     def __init__(self, sgd_result):
-        self.points = np.array(sgd_result.scalars, dtype_)
+        self.points = np.array(sgd_result.scaled_scalars, dtype_)
         self.func_utils = sgd_result.func_utils
         self.X, self.Y, self.Z = self.__calculate_values(shift=3, amount=1000)
         self.scaler_name = sgd_result.scaler_name

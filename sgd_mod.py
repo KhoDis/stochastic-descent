@@ -68,7 +68,29 @@ class RmsProp(DefaultGradientMod):
 
         grad = self._gradient(f, point)
         new_v = self.beta * self.previous_v + (1 - self.beta) * grad ** 2
-        grad = -learning_rate / np.sqrt(new_v) * grad
+        direction = -learning_rate / np.sqrt(new_v) * grad
 
         self.previous_v = new_v
-        return grad
+        return direction
+
+
+class Adam(DefaultGradientMod):
+    def __init__(self, beta1, beta2):
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.previous_v = None
+        self.previous_grad = None
+
+    def diff(self, f, point, learning_rate):
+        self.previous_v = np.zeros(point.shape[0]) if self.previous_v is None else self.previous_v
+        self.previous_grad = np.zeros(point.shape[0]) if self.previous_grad is None else self.previous_grad
+
+        grad = self._gradient(f, point)
+        new_v = self.beta1 * self.previous_v + (1 - self.beta1) * grad
+        new_grad = self.beta2 * self.previous_grad + (1 - self.beta2) * grad ** 2
+        direction = -learning_rate * new_grad / np.sqrt(new_v)
+
+        self.previous_v = new_v
+        self.previous_grad = new_grad
+
+        return direction

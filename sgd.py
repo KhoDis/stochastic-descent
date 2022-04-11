@@ -1,21 +1,21 @@
-import os
-import numpy as np
+import timeit
 
 import matplotlib as mpl
+import numpy as np
 from matplotlib import pyplot as plt, cm
+from memory_profiler import memory_usage, profile
 
-from drawer import Drawer, SGDResult
-from scaler import DefaultScaler, MinMaxScaler
 from dataset_reader import DatasetReader
+from drawer import Drawer, SGDResult
 from func_utils import FuncUtils
 # noinspection PyUnresolvedReferences
-from sgd_mod import DefaultGradientMod, MomentumGradientMod, NesterovGradientMod, AdaGradientMod, RmsProp
-# noinspection PyUnresolvedReferences
 from old.schedulers import ConstLRScheduler, DichotomyScheduler
+from scaler import DefaultScaler, MinMaxScaler
+# noinspection PyUnresolvedReferences
+from sgd_mod import DefaultGradientMod, MomentumGradientMod, NesterovGradientMod, AdaGradientMod, RmsProp
 
 mpl.use('TkAgg')
 
-# noinspection SpellCheckingInspection
 dtype_ = np.dtype("float64")
 
 
@@ -36,6 +36,7 @@ def draw_linear_regression(scalars, x, y):
     plt.show()
 
 
+@profile
 def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
         scheduler=ConstLRScheduler(0.1),
         scaler_ctor=None,
@@ -93,23 +94,36 @@ def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
             current_point += diff
             scalars.append(current_point.copy())
 
-    return scaler.rescale(scalars), SGDResult(scalars, FuncUtils(x, y), scaler_name, method_name)
+    return SGDResult(scaler.rescale(scalars), scalars, FuncUtils(x, y), scaler_name, method_name)
+
+
+def basic_sgd():
+    x, y = DatasetReader('planar').data
+    return sgd(x, y, start=[0, 1], batch_size=5, epoch=20, random_state=0,
+               scheduler=ConstLRScheduler(0.01),
+               scaler_ctor=MinMaxScaler,
+               sgd_mod=NesterovGradientMod(beta=0.9))
+
+
+def measure_memory():
+    return memory_usage(basic_sgd)  # () is for args, {} is for kwargs
 
 
 def main():
     x, y = DatasetReader('planar').data
     # x_batch = [[1, 2, 3], [1, 2, 3], ..., ] # n-1 мерная точка
     # y_batch = [1, 2, ..., ]
-    scalars, sgd_result = sgd(x, y, start=[0, 1], batch_size=5, epoch=20, random_state=0,
-                              scheduler=ConstLRScheduler(0.01),
-                              scaler_ctor=MinMaxScaler,
-                              sgd_mod=NesterovGradientMod(beta=0.9))
+    sgd_result = sgd(x, y, start=[0, 1], batch_size=5, epoch=20, random_state=0,
+                     scheduler=ConstLRScheduler(0.01),
+                     scaler_ctor=MinMaxScaler,
+                     sgd_mod=NesterovGradientMod(beta=0.9))
 
+    # print('time: ', timeit.Timer('basic_sgd()', "from __main__ import basic_sgd").timeit(1))
     drawer = Drawer(sgd_result)
     drawer.draw_2d(False)
     drawer.draw_3d(False)
 
-    print("Optimal:", scalars[-1])
+    print("Optimal:", sgd_result.rescaled_scalars[-1])
     # draw_linear_regression(scalars, x, y)
 
 

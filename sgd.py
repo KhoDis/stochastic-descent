@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib as mpl
 from matplotlib import pyplot as plt, cm
 
-from drawer import Drawer
+from drawer import Drawer, SGDResult
 from scaler import DefaultScaler, MinMaxScaler
 from dataset_reader import DatasetReader
 from func_utils import FuncUtils
@@ -17,74 +17,6 @@ mpl.use('TkAgg')
 
 # noinspection SpellCheckingInspection
 dtype_ = np.dtype("float64")
-
-
-def calculate_values(points, func_utils):
-    shift = 3
-    amount = 1000
-
-    last_point = points[-1]
-    X = np.linspace(last_point[0] - shift, last_point[0] + shift, amount)
-    Y = np.linspace(last_point[1] - shift, last_point[1] + shift, amount)
-
-    Z = np.ndarray((amount, amount))
-    for i in range(0, len(X)):
-        for j in range(0, len(Y)):
-            Z[j][i] = func_utils.f([X[i], Y[j]])
-
-    return X, Y, Z
-
-
-def draw_3d(points, func_utils, scaler_name, method_name):
-    points = np.array(points, dtype_)
-    X, Y, Z = calculate_values(points, func_utils)
-
-    ax = plt.figure(figsize=(5, 5)).add_subplot(111, projection='3d')
-    ax.plot_surface(*np.meshgrid(X, Y), Z,
-                    color='green', alpha=0.5)
-
-    for point in points:
-        ax.plot(point[0], point[1], func_utils.f(point),
-                color='black', marker='o', markersize=3)
-
-    color = iter(cm.rainbow(np.linspace(0, 1, len(points))))
-    for i in range(1, len(points)):
-        c = next(color)
-        ax.plot([points[i - 1][0], points[i][0]],
-                [points[i - 1][1], points[i][1]],
-                [func_utils.f(points[i - 1]), func_utils.f(points[i])],
-                color=c, alpha=0.8)
-
-    ax.contour(X, Y, Z, sorted([func_utils.f(p) for p in points]),
-               alpha=0.3)
-
-    path = f'./img/3d/'
-    os.makedirs(path, exist_ok=True)
-    plt.savefig(f'{path}/scaler-{scaler_name}_method-{method_name}.png')
-
-    plt.show()
-    plt.close()
-
-
-def draw_2d(points, func_utils, scaler_name, method_name):
-    points = np.array(points, dtype_)
-    X, Y, Z = calculate_values(points, func_utils)
-
-    plt.title('2d projection')
-    plt.xlabel('X axis')
-    plt.ylabel('Y axis')
-
-    plt.plot(points[:, 0], points[:, 1], 'o-')
-    plt.text(*points[0], f'({points[0][0]}, {points[0][1]}) - {func_utils.f(points[0]):.5f}')
-    plt.text(*points[-1], f'({points[-1][0]:.2f}, {points[-1][1]:.2f}) - {func_utils.f(points[-1]):.5f}')
-    plt.contour(X, Y, Z, sorted([func_utils.f(p) for p in points]))
-
-    path = f'./img/2d/'
-    os.makedirs(path, exist_ok=True)
-    plt.savefig(f'{path}/scaler-{scaler_name}_method-{method_name}.png')
-
-    plt.show()
-    plt.close()
 
 
 def draw_linear_regression(scalars, x, y):
@@ -161,22 +93,21 @@ def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
             current_point += diff
             scalars.append(current_point.copy())
 
-    # draw_2d(scalars, FuncUtils(x, y), scaler_name, method_name)
-    # draw_3d(scalars, FuncUtils(x, y), scaler_name, method_name)
-    drawer = Drawer(scalars, FuncUtils(x, y), scaler_name, method_name)
-    drawer.draw_2d(False)
-    drawer.draw_3d(False)
-    return scaler.rescale(scalars)
+    return scaler.rescale(scalars), SGDResult(scalars, FuncUtils(x, y), scaler_name, method_name)
 
 
 def main():
     x, y = DatasetReader('planar').data
     # x_batch = [[1, 2, 3], [1, 2, 3], ..., ] # n-1 мерная точка
     # y_batch = [1, 2, ..., ]
-    scalars = sgd(x, y, start=[0, 1], batch_size=5, epoch=20, random_state=0,
-                  scheduler=ConstLRScheduler(0.01),
-                  scaler_ctor=MinMaxScaler,
-                  sgd_mod=NesterovGradientMod(beta=0.9))
+    scalars, sgd_result = sgd(x, y, start=[0, 1], batch_size=5, epoch=20, random_state=0,
+                              scheduler=ConstLRScheduler(0.01),
+                              scaler_ctor=MinMaxScaler,
+                              sgd_mod=NesterovGradientMod(beta=0.9))
+
+    drawer = Drawer(sgd_result)
+    drawer.draw_2d(True)
+    drawer.draw_3d(True)
 
     print("Optimal:", scalars[-1])
     # draw_linear_regression(scalars, x, y)

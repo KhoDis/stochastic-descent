@@ -20,7 +20,7 @@ mpl.use('TkAgg')
 dtype_ = np.dtype("float64")
 
 
-def draw_linear_regression(scalars, x, y):
+def draw_linear_regression(show, scalars, x, y, scaler_name, method_name):
     plt.title('Gradient Descent')
     plt.xlabel('X axis')
     plt.ylabel('Y axis')
@@ -34,10 +34,15 @@ def draw_linear_regression(scalars, x, y):
         for i in range(1, len(scalar)):
             y += x * scalar[i]
         plt.plot(x, y, color=c)
-    plt.show()
+
+    if show:
+        plt.show()
+    directory = './img/linear_regression'
+    os.makedirs(directory, exist_ok=True)
+    plt.savefig(f'{directory}/scaler-{scaler_name}_method-{method_name}.png')
+    plt.close()
 
 
-@profile
 def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
         scheduler=None,
         scaler_ctor=None,

@@ -44,7 +44,7 @@ class Drawer(object):
     def __init__(self, sgd_result):
         self.points = np.array(sgd_result.scaled_scalars, dtype_)
         self.func_utils = sgd_result.func_utils
-        self.X, self.Y, self.Z = self.__calculate_values(shift=3, amount=1000)
+        self.X, self.Y, self.Z = self.__calculate_values(shift=10, amount=1000)
         self.scaler_name = sgd_result.scaler_name
         self.method_name = sgd_result.method_name
         self.surface_config = SurfaceConfig(alpha=0.2, color='green')

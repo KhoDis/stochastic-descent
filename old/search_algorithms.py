@@ -70,6 +70,9 @@ class Dichotomy:
 
         alpha = alpha_curr * strength
         g_next = self.g(alpha)
+        print(alpha)
+
+        print('VALUES:', g_curr, g_next)
 
         while g_curr >= g_next:
             alpha *= strength

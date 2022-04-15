@@ -66,7 +66,7 @@ class Drawer(object):
 
         return X, Y, Z
 
-    def draw_3d(self, save_image=True):
+    def draw_3d(self, show_image=True):
         ax = plt.figure(figsize=(5, 5)).add_subplot(111, projection='3d')
         ax.plot_surface(*np.meshgrid(self.X, self.Y), self.Z,
                         color=self.surface_config.color,
@@ -91,13 +91,13 @@ class Drawer(object):
                    linestyles=self.contour_config.linestyles,
                    linewidths=self.contour_config.linewidths)
 
-        if save_image:
-            self.__save_plot('./img/3d')
+        if show_image:
+            plt.show()
 
-        plt.show()
+        self.__save_plot('./img/3d')
         plt.close()
 
-    def draw_2d(self, save_image=True):
+    def draw_2d(self, show_image=True):
         plt.title('2d projection')
         plt.xlabel('X axis')
         plt.ylabel('Y axis')
@@ -110,10 +110,10 @@ class Drawer(object):
         plt.text(*self.points[-1], self.__point_text(self.points[-1]))
         plt.contour(self.X, self.Y, self.Z, sorted([self.func_utils.f(p) for p in self.points]))
 
-        if save_image:
-            self.__save_plot('./img/2d')
+        if show_image:
+            plt.show()
 
-        plt.show()
+        self.__save_plot('./img/2d')
         plt.close()
 
     def __point_text(self, point):

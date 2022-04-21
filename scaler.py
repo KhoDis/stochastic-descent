@@ -43,3 +43,25 @@ class MinMaxScaler(AbstractScaler):
         axis_max = np.amax(axis)
         scaled = (axis - axis_min) / (axis_max - axis_min)
         return scaled, [axis_min, axis_max - axis_min]
+
+
+class MeanScaler(AbstractScaler):
+    def __init__(self, data):
+        super().__init__(data)
+
+    def _scale_axis(self, axis):
+        axis_min = np.amin(axis)
+        axis_max = np.amax(axis)
+        axis_mean = np.mean(axis)
+        scaled = (axis - axis_mean) / (axis_max - axis_min)
+        return scaled, [axis_mean, axis_max - axis_min]
+
+
+class UnitLengthScaler(AbstractScaler):
+    def __init__(self, data):
+        super().__init__(data)
+
+    def _scale_axis(self, axis):
+        axis_length = len(axis)
+        scaled = axis / axis_length
+        return scaled, [0, axis_length]

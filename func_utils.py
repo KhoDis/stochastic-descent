@@ -1,5 +1,7 @@
 import numpy as np
 
+gradient_counter = 0
+
 
 class FuncUtils(object):
     def __init__(self, x, y):
@@ -16,6 +18,8 @@ class FuncUtils(object):
         return accumulator
 
     def gradient(self, point):
+        global gradient_counter
+        gradient_counter += 1
         h = 1e-5
         result = np.zeros(point.size)
         for i, n in enumerate(point):
@@ -27,6 +31,11 @@ class FuncUtils(object):
             result[i] = (f_plus - f_minus) / (2 * h)
         return result
 
+def set_counter(value):
+    gradient_counter = value
+
+def get_counter():
+    return gradient_counter
 
 # def f(point, x, y):
 #     accumulator = 0

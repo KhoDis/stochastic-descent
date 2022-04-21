@@ -22,11 +22,13 @@ dtype_ = np.dtype("float64")
 def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
         scheduler=None,
         scaler_ctor=None,
-        sgd_mod=DefaultGradientMod()):
+        sgd_mod=None):
+    set_counter(0)
     tolerance = 1e-06
 
     scheduler = ConstLRScheduler(0.1) if scheduler is None else scheduler
     scaler_ctor = DefaultScaler if scaler_ctor is None else scaler_ctor
+    sgd_mod = DefaultGradientMod() if sgd_mod is None else sgd_mod
 
     x = np.array(x, dtype=dtype_)
     y = np.array(y, dtype=dtype_)

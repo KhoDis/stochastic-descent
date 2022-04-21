@@ -50,7 +50,7 @@ class AdaGradientMod(DefaultGradientMod):
         self.previous_s = np.ones(point.shape[0]) if self.previous_s is None else self.previous_s
 
         grad = self._gradient(f, point)
-        new_s = np.array(self.previous_s + grad ** 2)
+        new_s = np.add(self.previous_s, np.square(grad))
         direction = - learning_rate / np.sqrt(new_s) * grad
 
         self.previous_s = new_s
@@ -74,7 +74,7 @@ class RmsPropGradientMod(DefaultGradientMod):
         return direction
 
 
-class Adam(DefaultGradientMod):
+class AdamGradientMod(DefaultGradientMod):
     def __init__(self, beta1, beta2):
         self.beta1 = beta1
         self.beta2 = beta2

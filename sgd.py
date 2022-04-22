@@ -7,12 +7,14 @@ from memory_profiler import memory_usage, profile
 
 from dataset_reader import DatasetReader
 from drawer import Drawer, SGDResult
-from func_utils import FuncUtils
+from func_utils import *
 # noinspection PyUnresolvedReferences
 from old.schedulers import ConstLRScheduler, DichotomyScheduler, ExponentialLRScheduler
 from scaler import DefaultScaler, MinMaxScaler, MeanScaler, UnitLengthScaler
 # noinspection PyUnresolvedReferences
 from sgd_mod import *
+import datetime
+import tracemalloc
 
 mpl.use('TkAgg')
 
@@ -37,7 +39,7 @@ def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
     scaler = scaler_ctor(x)
     x = scaler.data
 
-    method_name = type(sgd_mod).__name__[:-3]
+    method_name = type(sgd_mod).__name__[:-11]
     scaler_name = type(scaler).__name__
 
     seed = None if random_state is None else int(random_state)
@@ -60,8 +62,9 @@ def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
 
     scalars = [start]
     iter_count = 0
-    start = datetime.datetime.now()
+    start_time = datetime.datetime.now()
     tracemalloc.start()
+    print('Before ', get_counter())
     for i in range(epoch):
         # rng.shuffle(xy)
 
@@ -81,10 +84,13 @@ def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
             current_point += diff
             scalars.append(current_point.copy())
 
-    end = datetime.datetime.now()
+    print('After ', get_counter())
+
+    end_time = datetime.datetime.now()
     _, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
-    return SGDResult(scaler.rescale(scalars), scalars, FuncUtils(x, y), batch_size, scaler_name, method_name, end - start, peak, get_counter())
+    return SGDResult(scaler.rescale(scalars), scalars, FuncUtils(x, y), batch_size, scaler_name, method_name,
+                     (end_time - start_time).total_seconds(), peak / 1024, get_counter())
 
 
 def basic_sgd():
@@ -119,7 +125,11 @@ def main():
         10,
         15
     ]:
-        for scaler in [MinMaxScaler]:
+        for scaler in [
+            DefaultScaler,
+            # MinMaxScaler
+        ]:
+            sgd_mods = []
             for mod, lr, epoch in [
                 (DefaultGradientMod(), 0.04, 50),
                 (NesterovGradientMod(beta=0.9), 0.006, 50),
@@ -128,19 +138,52 @@ def main():
                 (RmsPropGradientMod(beta=0.9), 0.8, 50),
                 (AdamGradientMod(beta1=0.9, beta2=0.999), 0.25, 50),
             ]:
-                sgd_result = task_3(batch_size=batch, scaler=scaler, mod=mod, x=x, y=y, lr=lr, epoch=epoch)
-                sgd_results.append(sgd_result)
+                # sgd_result = task_3(batch_size=batch, scaler=scaler, mod=mod, x=x, y=y, lr=lr, epoch=epoch)
+                sgd_re
+                sgd_mods.append(sgd_result)
 
                 drawer = Drawer(sgd_result)
-                drawer.draw_2d(show_image=True)
+                drawer.draw_2d(show_image=False)
                 # drawer.draw_3d(show_image=True)
 
                 print("Optimal:", sgd_result.rescaled_scalars[-1])
-                nth = int(max(len(sgd_result.rescaled_scalars), line_count) / line_count)
+                # nth = int(max(len(sgd_result.rescaled_scalars), line_count) / line_count)
                 # drawer.draw_linear_regression(x, y, nth=nth, show_image=False)
+            sgd_results.append(sgd_mods)
 
-    # draw_hist(list(map(lambda result: result.time)))
-    # draw_hist(memory_usage)
+    # draw_bars(lambda result: result.time, 'Time(s)', sgd_results)
+    # draw_bars(lambda result: result.memory, 'Memory(KB)', sgd_results)
+    # draw_bars(lambda result: result.grad_calls, 'Gradient called', sgd_results)
+    # print(f'{Gradient called}')
+
+
+def draw_bars(func, name, sgd_results):
+    batches = list(map(lambda mod_elems: mod_elems[0].batch_size, sgd_results))
+    ind = np.arange(len(batches))
+    width = 0.1
+
+    colors = ['red', 'green', 'blue', 'yellow', 'magenta', 'cyan']
+    vals = []
+    bars = []
+    for i in range(len(sgd_results[0])):
+        ivals = []
+        for j in range(len(sgd_results)):
+            ivals.append(func(sgd_results[j][i]))
+        vals.append(ivals)
+        bars.append(plt.bar(ind + width * i, ivals, width, color=colors[i]))
+
+    plt.xlabel("Batch")
+    plt.ylabel(name)
+    plt.title(f"{name} measurement")
+
+    names = list(map(lambda result: result.method_name, sgd_results[0]))
+    plt.xticks(ind + width, batches)
+    b = tuple(bars)
+    n = tuple(names)
+    print(b, n)
+    plt.legend(b, n)
+    plt.savefig(f'img/stats/{name}.png')
+    plt.show()
 
 
 def task_3(mod, batch_size, scaler, x, y, lr, epoch):

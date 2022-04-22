@@ -32,6 +32,7 @@ class FuncUtils(object):
         return result
 
 def set_counter(value):
+    global gradient_counter
     gradient_counter = value
 
 def get_counter():

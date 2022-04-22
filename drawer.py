@@ -118,7 +118,7 @@ class Drawer(object):
         self.__complete_plot('./img/3d', show_image)
 
     def draw_2d(self, show_image=True):
-        plt.title('2d projection')
+        plt.title('2d-b1 projection')
         plt.xlabel('X axis')
         plt.ylabel('Y axis')
 

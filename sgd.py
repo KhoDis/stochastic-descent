@@ -1,204 +1,210 @@
+import timeit
+
 import matplotlib as mpl
 import numpy as np
 from matplotlib import pyplot as plt, cm
+from memory_profiler import memory_usage, profile
 
 from dataset_reader import DatasetReader
-from old.search_algorithms import Dichotomy
+from drawer import Drawer, SGDResult
+from func_utils import *
+# noinspection PyUnresolvedReferences
+from old.schedulers import ConstLRScheduler, DichotomyScheduler, ExponentialLRScheduler
+from scaler import DefaultScaler, MinMaxScaler, MeanScaler, UnitLengthScaler
+# noinspection PyUnresolvedReferences
+from sgd_mod import *
+import datetime
+import tracemalloc
 
 mpl.use('TkAgg')
 
-# noinspection DuplicatedCode
-def f(point, x, y):
-    # print('f_point', point)
-    # print('f_x', x)
-    # print('f_y', y)
-    accumulator = 0
-    for j in range(0, len(y)):
-        prediction = point[0]
-        for i in range(1, len(point)):
-            prediction += x[j][i - 1] * point[i]
-        accumulator += (y[j] - prediction) ** 2
-    return accumulator
+dtype_ = np.dtype("float64")
 
 
-def draw_2d_surface(points, x, y):
-    points = np.array(points, "float64")
-    print('x', x)
-    print('y', y)
+def sgd(x, y, start, batch_size=1, epoch=50, random_state=None,
+        scheduler=None,
+        scaler_ctor=None,
+        sgd_mod=None):
+    set_counter(0)
+    tolerance = 1e-06
 
-    # shift = 2
-    # last_point = points[-1]
-    x_axis = np.linspace(-5, 5, 1000)
-    y_axis = np.linspace(-5, 5, 1000)
-    # x_axis = np.linspace(last_point[0] - shift, last_point[0] + shift, 1000)
-    # y_axis = np.linspace(last_point[1] - shift, last_point[1] + shift, 1000)
-    zp = np.ndarray((1000, 1000))
-    # grid = np.meshgrid(x_axis, y_axis)
-    # ax = plt.figure().add_subplot(projection='3d')
-    # ax.plot_surface(*grid, f(grid, x, y))
-
-    # TODO: try out axis swapping
-    # TODO: annotate contours
-    for i in range(0, len(x_axis)):
-        for j in range(0, len(y_axis)):
-            zp[j][i] = f([x_axis[i], y_axis[j]], x, y)
-
-    plt.plot(points[:, 0], points[:, 1], 'o-')
-    plt.text(*points[0], f'({points[0][0]}, {points[0][1]}) - {f(points[0], x, y):.5f}')
-    plt.text(*points[-1], f'({points[-1][0]:.2f}, {points[-1][1]:.2f}) - {f(points[-1], x, y):.5f}')
-    levels = sorted([f(p, x, y) for p in points])
-    print('levels', levels)
-    # contours = plt.contour(*grid, f(grid, x, y), levels=levels)
-    contours = plt.contour(x_axis, y_axis, zp, levels)
-    plt.clabel(contours, inline=1, fontsize=10)
-    plt.show()
-    plt.clf()
-
-
-def grad(x_batch, y_batch, point):
-    h = 1e-5
-    result = np.zeros(point.size)
-    for i, n in enumerate(point):
-        point[i] = point[i] + h
-        f_plus = f(point, x_batch, y_batch)
-        point[i] = point[i] - 2 * h
-        f_minus = f(point, x_batch, y_batch)
-        point[i] = point[i] + h
-        result[i] = (f_plus - f_minus) / (2 * h)
-    return result
-
-
-def scale(axis):
-    axis_min = np.amin(axis)
-    axis_max = np.amax(axis)
-    scaled = (axis - axis_min) / (axis_max - axis_min)
-    return scaled, (lambda vector: vector * (axis_max - axis_min) + axis_min)
-
-
-def sgd(
-        gradient, x, y, start, batch_size=1, epoch=50,
-        tolerance=1e-06, random_state=None, dtype="float64"):
-    dtype_ = np.dtype(dtype)
+    scheduler = ConstLRScheduler(0.1) if scheduler is None else scheduler
+    scaler_ctor = DefaultScaler if scaler_ctor is None else scaler_ctor
+    sgd_mod = DefaultGradientMod() if sgd_mod is None else sgd_mod
 
     x = np.array(x, dtype=dtype_)
     y = np.array(y, dtype=dtype_)
-
     n_obs = len(x)
 
-    # x_reverts = []
-    # x_axes = []
-    # for x_row in np.transpose(x):
-    #     x_row_scaled, revert = scale(x_row)
-    #     x_axes.append(x_row_scaled)
-    #     x_reverts.append(revert)
-    #
-    # y, y_revert = scale(y)
-    # x = np.array(np.transpose(x_axes), dtype=dtype_)
+    scaler = scaler_ctor(x)
+    x = scaler.data
 
-    # Initializing the random number generator for shuffling (link further)
+    method_name = type(sgd_mod).__name__[:-11]
+    scaler_name = type(scaler).__name__
+
     seed = None if random_state is None else int(random_state)
     rng = np.random.default_rng(seed=seed)
 
-    # Initializing the values of the variables
-    current_point = np.array(start, dtype=dtype_)
-
-    # Setting up and checking the learning rate
-    # learn_rate = np.array(learn_rate, dtype=dtype_)
-    # if np.any(learn_rate <= 0):
-    #     raise ValueError("'learn_rate' must be greater than zero")
-
-    # Setting up and checking the size of minibatches
-    # Making sure they are not float
     batch_size = int(batch_size)
-
-    # batch_size = {1} => SGD
-    # batch_size = [2, n_obs) => minibatch
-    # batch_size = {n_obs} => GD
     if not 0 < batch_size <= n_obs:
         raise ValueError("'batch_size' must be greater than zero and less than or equal to the number of observations")
 
-    # Setting up and checking the maximal number of iterations
     epoch = int(epoch)
     if epoch <= 0:
         raise ValueError("'epoch' must be greater than zero")
 
-    # Setting up and checking the tolerance
-    # We need it to check if the absolute difference is small enough
-    # We want to ignore absurdly different points to not to break our predictions
     tolerance = np.array(tolerance, dtype=dtype_)
     if np.any(tolerance <= 0):
         raise ValueError("'tolerance' must be greater than zero")
 
-    start = np.array(start, dtype=dtype_)
-
+    current_point = np.array(start, dtype=dtype_)
     xy = np.c_[x.reshape(n_obs, -1), y.reshape(n_obs, 1)]
 
-    # Performing the gradient descent loop
-    elements = [start]
+    scalars = [start]
+    iter_count = 0
+    start_time = datetime.datetime.now()
+    tracemalloc.start()
+    print('Before ', get_counter())
     for i in range(epoch):
-        # print(f'epoch={i}')
-        # Shuffle x and y
-        # https://www.quora.com/Why-do-we-need-to-shuffle-inputs-for-stochastic-gradient-descent
-        # Shuffles n-dim dataset without breaking points
-        rng.shuffle(xy)
+        # rng.shuffle(xy)
 
-        # Performing minibatch moves
         for start in range(0, n_obs, batch_size):
-            # print(f'start={start}')
-            # Calculates interval [    start|-------|stop    ] of the batch
+            iter_count += 1
             stop = start + batch_size
+            x_batch = xy[start:stop, :-1]
+            y_batch = xy[start:stop, -1:]
 
-            # TODO: We need to expand this to n dimensions
-            # n_batch = get_batch(dataset, start, stop)
-            # x_batch, y_batch = dataset[start:stop, :-1], dataset[start:stop, -1:]
+            u = FuncUtils(x_batch, y_batch)
+            learning_rate = scheduler.show(iter_count, u, current_point)
+            diff = sgd_mod.diff(u, current_point, learning_rate)
 
-            # Recalculating the difference
-            # TODO: We need to pass to the gradient n dimensional batch and current_point (2 args). Code is below
-            # grad = np.array(gradient(n_batch, current_point), dtype_)
-            grad_ = np.array(gradient(xy[start:stop, :-1], xy[start:stop, -1:], current_point), dtype_)
+            if np.all(np.abs(diff) <= tolerance):
+                break
 
-            # print('current_point', current_point)
-            # print('-grad_', -grad_)
-            diff = -Dichotomy(current_point, -grad_, xy[start:stop, :-1], xy[start:stop, -1:]).calculate() * grad_
-
-            # # Checking if the absolute difference is small enough
-            # if np.all(np.abs(diff) <= tolerance):
-            #     break
-
-            # Updating the values of the variables
             current_point += diff
-            elements.append(current_point.copy())
+            scalars.append(current_point.copy())
 
-    # draw_2d(elements, x, y)
+    print('After ', get_counter())
 
-    # draw_2d_surface(np.array(elements), x, y)
-    return elements  # TODO: rename
+    end_time = datetime.datetime.now()
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    return SGDResult(scaler.rescale(scalars), scalars, FuncUtils(x, y), batch_size, scaler_name, method_name,
+                     (end_time - start_time).total_seconds(), peak / 1024, get_counter())
+
+
+def basic_sgd():
+    x, y = DatasetReader('planar').data
+    return sgd(x, y, start=[0, 1], batch_size=5, epoch=20, random_state=0,
+               scheduler=ConstLRScheduler(0.01),
+               scaler_ctor=MinMaxScaler,
+               sgd_mod=NesterovGradientMod(beta=0.9))
+
+
+def measure_memory():
+    return memory_usage(basic_sgd)  # () is for args, {} is for kwargs
 
 
 def main():
-    x, y = DatasetReader('planar').data
+    x, y = DatasetReader('planar_hard').data
     # x_batch = [[1, 2, 3], [1, 2, 3], ..., ] # n-1 мерная точка
     # y_batch = [1, 2, ..., ]
-    scalars = sgd(grad, x, y, start=[0, 1], batch_size=5, epoch=50, random_state=0)
-    # print(np.array(scalars))
-    draw_2d_surface(np.array(scalars), x, y)
+
+    # sgd_result = sgd(x, y, start=[0, 1], batch_size=15, epoch=1000, random_state=0,
+    #                  scheduler=ExponentialLRScheduler(1, 0.9),
+    #                  scaler_ctor=DefaultScaler,
+    #                  sgd_mod=DefaultGradientMod())
+
+    # print('time: ', timeit.Timer('basic_sgd()', "from __main__ import basic_sgd").timeit(1))
+
+    line_count = 50
+    sgd_results = []
+    for batch in [
+        1,
+        5,
+        10,
+        15
+    ]:
+        for scaler in [
+            DefaultScaler,
+            # MinMaxScaler
+        ]:
+            sgd_mods = []
+            for mod, lr, epoch in [
+                (DefaultGradientMod(), 0.04, 50),
+                (NesterovGradientMod(beta=0.9), 0.006, 50),
+                (MomentumGradientMod(beta=0.9), 0.1, 50),
+                (AdaGradientMod(), 5, 50),
+                (RmsPropGradientMod(beta=0.9), 0.8, 50),
+                (AdamGradientMod(beta1=0.9, beta2=0.999), 0.25, 50),
+            ]:
+                # sgd_result = task_3(batch_size=batch, scaler=scaler, mod=mod, x=x, y=y, lr=lr, epoch=epoch)
+                sgd_re
+                sgd_mods.append(sgd_result)
+
+                drawer = Drawer(sgd_result)
+                drawer.draw_2d(show_image=False)
+                # drawer.draw_3d(show_image=True)
+
+                print("Optimal:", sgd_result.rescaled_scalars[-1])
+                # nth = int(max(len(sgd_result.rescaled_scalars), line_count) / line_count)
+                # drawer.draw_linear_regression(x, y, nth=nth, show_image=False)
+            sgd_results.append(sgd_mods)
+
+    # draw_bars(lambda result: result.time, 'Time(s)', sgd_results)
+    # draw_bars(lambda result: result.memory, 'Memory(KB)', sgd_results)
+    # draw_bars(lambda result: result.grad_calls, 'Gradient called', sgd_results)
+    # print(f'{Gradient called}')
 
 
-def draw_2d(scalars, x, y):
-    plt.title('Gradient Descent')
-    plt.xlabel('X axis')
-    plt.ylabel('Y axis')
-    for point_index in range(0, len(x)):
-        plt.scatter(x[point_index][0], y[point_index], c="green")
-    color = iter(cm.rainbow(np.linspace(0, 1, len(scalars))))
-    for scalar in scalars:
-        c = next(color)
-        x = np.linspace(0, 10, 10)
-        y = scalar[0]
-        for i in range(1, len(scalar)):
-            y += x * scalar[i]
-        plt.plot(x, y, color=c)
+def draw_bars(func, name, sgd_results):
+    batches = list(map(lambda mod_elems: mod_elems[0].batch_size, sgd_results))
+    ind = np.arange(len(batches))
+    width = 0.1
+
+    colors = ['red', 'green', 'blue', 'yellow', 'magenta', 'cyan']
+    vals = []
+    bars = []
+    for i in range(len(sgd_results[0])):
+        ivals = []
+        for j in range(len(sgd_results)):
+            ivals.append(func(sgd_results[j][i]))
+        vals.append(ivals)
+        bars.append(plt.bar(ind + width * i, ivals, width, color=colors[i]))
+
+    plt.xlabel("Batch")
+    plt.ylabel(name)
+    plt.title(f"{name} measurement")
+
+    names = list(map(lambda result: result.method_name, sgd_results[0]))
+    plt.xticks(ind + width, batches)
+    b = tuple(bars)
+    n = tuple(names)
+    print(b, n)
+    plt.legend(b, n)
+    plt.savefig(f'img/stats/{name}.png')
     plt.show()
+
+
+def task_3(mod, batch_size, scaler, x, y, lr, epoch):
+    return sgd(x, y, start=[0, 1], batch_size=batch_size, epoch=epoch, random_state=0,
+               scheduler=ConstLRScheduler(lr),
+               scaler_ctor=scaler,
+               sgd_mod=mod)
+
+
+def task_2(batch_size, scaler, x, y):
+    return sgd(x, y, start=[0, 1], batch_size=batch_size, epoch=70, random_state=0,
+               scheduler=ConstLRScheduler(0.03),
+               scaler_ctor=scaler,
+               sgd_mod=DefaultGradientMod())
+
+
+def task_1(batch_size, scaler, x, y):
+    return sgd(x, y, start=[0, 1], batch_size=batch_size, epoch=500, random_state=0,
+               scheduler=ConstLRScheduler(0.0008),
+               scaler_ctor=scaler,
+               sgd_mod=DefaultGradientMod())
 
 
 if __name__ == '__main__':

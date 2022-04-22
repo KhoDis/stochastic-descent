@@ -1,16 +1,14 @@
-from deprecated import deprecated
 from numpy import exp
 
-from search_algorithms import Dichotomy
+from old.search_algorithms import Dichotomy
 
 
-@deprecated
 class ConstLRScheduler:
     def __init__(self, const):
         self.const = const
 
     # noinspection PyUnusedLocal
-    def show(self, n, point, direction):
+    def show(self, n, func_utils, point):
         return self.const
 
     @staticmethod
@@ -18,14 +16,13 @@ class ConstLRScheduler:
         return 'const'
 
 
-@deprecated
 class SteppedLRScheduler:
     def __init__(self, start, step):
         self.start = start
         self.step = step
 
     # noinspection PyUnusedLocal
-    def show(self, n, point, direction):
+    def show(self, n, func_utils, point):
         return self.start + self.step * n
 
     @staticmethod
@@ -33,14 +30,13 @@ class SteppedLRScheduler:
         return 'stepped'
 
 
-@deprecated
 class ExponentialLRScheduler:
     def __init__(self, start, step):
         self.start = start
         self.step = step
 
     # noinspection PyUnusedLocal
-    def show(self, n, point, direction):
+    def show(self, n, func_utils, point):
         return self.start * exp(-n * self.step)
 
     @staticmethod
@@ -48,12 +44,11 @@ class ExponentialLRScheduler:
         return 'exponential'
 
 
-@deprecated
 class DichotomyScheduler:
     # noinspection PyUnusedLocal
-    # noinspection PyMethodMayBeStatic
-    def show(self, n, point, direction):
-        return Dichotomy(point, direction).calculate()
+    @staticmethod
+    def show(n, func_utils, point):
+        return Dichotomy(point, func_utils).calculate()
 
     @staticmethod
     def name():
